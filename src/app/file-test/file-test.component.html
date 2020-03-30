@@ -62,6 +62,7 @@
       </section>
     </div>
     <div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="start center">
+      <input [(ngModel)]="trackInner" type="checkbox"> Track inner
       <button (click)="start(false)" [disabled]="!initialImageContent || loading">Auto tracking</button>
       <button (click)="start(true)" [disabled]="!initialImageContent || loading">Draw rect</button>
     </div>

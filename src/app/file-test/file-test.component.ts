@@ -37,6 +37,8 @@ export class FileTestComponent implements OnInit, AfterViewInit {
     contrast: number;
     brightness: number;
 
+    trackInner: boolean;
+
     processor: OCRProcessor;
 
     get ocrOptions() {
@@ -108,7 +110,11 @@ export class FileTestComponent implements OnInit, AfterViewInit {
             this.results = await this.processor.recognizeFromRect(img.src, r, this.ocrOptions);
         } else {
             this.loading = true;
-            this.results = await this.processor.track(img.src, this.ocrOptions);
+            if (this.trackInner) {
+                this.results = await this.processor.trackInner(img.src, this.ocrOptions);
+            } else {
+                this.results = await this.processor.track(img.src, this.ocrOptions);
+            }
         }
         this.loading = false;
     }

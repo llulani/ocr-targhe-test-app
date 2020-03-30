@@ -65,53 +65,13 @@ export class OCRProcessor {
     }
 
     async track(imageData, options: OCRProcessorOptions = DEFAULT_OPTIONS): Promise<OcrResult[]> {
-        return new Promise(resolve => {
-            tracking.ColorTracker.registerColor(
-                'white',
-                // (r, g, b) => r >= 80 && r <= 255 && g >= 80 && g <= 255 && b >= 80 && b <= 255
-                (r, g, b) =>
-                    r >= options.MIN_R &&
-                    r <= options.MAX_R &&
-                    g >= options.MIN_G &&
-                    g <= options.MAX_G &&
-                    b >= options.MIN_B &&
-                    b <= options.MAX_B
-            );
+        this.rects = await trackColor(options, this.context2d);
+        return this.cropAndRecognize(imageData, options);
+    }
 
-            const colorTracker = new tracking.ColorTracker(['white']);
-            colorTracker.on('track', event => {
-                if (event.data.length === 0) {
-                    // No colors were detected in this frame.
-                } else {
-                    event.data.forEach(rect => {
-                        const exists = this.rects.some(r => {
-                            const found = rect.x >= r.x && rect.x <= r.x + r.width && rect.y >= r.y && rect.y <= r.y + r.height;
-                            return found;
-                        });
-
-                        if (!exists) {
-                            // console.log(rect.x, rect.y, rect.height, rect.width, rect.color);
-                            const i = this.rects.push(rect);
-
-                            const context = this.context2d;
-                            context.strokeStyle = '#ff0000';
-                            context.font = 'bold 12px Helvetica';
-                            context.fillStyle = '#ff0000';
-                            context.lineWidth = 4;
-                            context.strokeRect(rect.x, rect.y, rect.width, rect.height);
-                            // context.fillText('x: ' + rect.x + 'px', rect.x + rect.width + 5, rect.y + 11);
-                            // context.fillText('y: ' + rect.y + 'px', rect.x + rect.width + 5, rect.y + 22);
-                            context.fillText('Crop ' + (i - 1), rect.x + 10, rect.y + 10);
-                        }
-                    });
-
-                    resolve(this.cropAndRecognize(imageData, options));
-                }
-            });
-
-            // tracking.track('#canvas', colorTracker, { camera: true });
-            tracking.track('#canvas', colorTracker);
-        });
+    async trackInner(imageData, options: OCRProcessorOptions = DEFAULT_OPTIONS): Promise<OcrResult[]> {
+        this.rects = await trackInnerRect(options, this.context2d);
+        return this.cropAndRecognize(imageData, options);
     }
 
     private async cropAndRecognize(imageData, options: OCRProcessorOptions) {
@@ -254,4 +214,156 @@ export class OCRProcessor {
         await this.worker.terminate();
         return results;
     }
+}
+
+async function trackColor(options, context2d?): Promise<any[]> {
+    return new Promise(resolve => {
+        const rects = [];
+        tracking.ColorTracker.registerColor(
+            'white',
+            // (r, g, b) => r >= 80 && r <= 255 && g >= 80 && g <= 255 && b >= 80 && b <= 255
+            (r, g, b) =>
+                r >= options.MIN_R &&
+                r <= options.MAX_R &&
+                g >= options.MIN_G &&
+                g <= options.MAX_G &&
+                b >= options.MIN_B &&
+                b <= options.MAX_B
+        );
+
+        const colorTracker = new tracking.ColorTracker(['white']);
+        colorTracker.on('track', event => {
+            if (event.data.length === 0) {
+                // No colors were detected in this frame.
+            } else {
+                event.data.forEach(rect => {
+                    const exists = rects.some(r => {
+                        const found = rect.x >= r.x && rect.x <= r.x + r.width && rect.y >= r.y && rect.y <= r.y + r.height;
+                        return found;
+                    });
+
+                    if (!exists) {
+                        // console.log(rect.x, rect.y, rect.height, rect.width, rect.color);
+                        const i = rects.push(rect);
+                        if (context2d) {
+                            context2d.strokeStyle = '#ff0000';
+                            context2d.font = 'bold 12px Helvetica';
+                            context2d.fillStyle = '#ff0000';
+                            context2d.lineWidth = 4;
+                            context2d.strokeRect(rect.x, rect.y, rect.width, rect.height);
+                            // context.fillText('x: ' + rect.x + 'px', rect.x + rect.width + 5, rect.y + 11);
+                            // context.fillText('y: ' + rect.y + 'px', rect.x + rect.width + 5, rect.y + 22);
+                            context2d.fillText('Crop ' + (i - 1), rect.x + 10, rect.y + 10);
+                        }
+                    }
+                });
+                console.log(rects);
+                resolve(rects);
+            }
+        });
+
+        // tracking.track('#canvas', colorTracker, { camera: true });
+        tracking.track('#canvas', colorTracker);
+    });
+}
+
+async function trackInnerRect(options, context2d?): Promise<any[]> {
+    return new Promise(resolve => {
+        let rects = [];
+        tracking.ColorTracker.registerColor(
+            'white',
+            // (r, g, b) => r >= 80 && r <= 255 && g >= 80 && g <= 255 && b >= 80 && b <= 255
+            (r, g, b) =>
+                r >= options.MIN_R &&
+                r <= options.MAX_R &&
+                g >= options.MIN_G &&
+                g <= options.MAX_G &&
+                b >= options.MIN_B &&
+                b <= options.MAX_B
+        );
+
+        const colorTracker = new tracking.ColorTracker(['white']);
+        colorTracker.on('track', event => {
+            if (event.data.length === 0) {
+                // No colors were detected in this frame.
+            } else {
+                event.data.forEach(rect => {
+                    const exists = rects.some(r => {
+                        const found = rect.x >= r.x && rect.x <= r.x + r.width && rect.y >= r.y && rect.y <= r.y + r.height;
+                        return found;
+                    });
+
+                    if (!exists) {
+                        // console.log(rect.x, rect.y, rect.height, rect.width, rect.color);
+                        rects.push(rect);
+                    }
+                });
+
+                // find rectangles with similar y (tolerance <= 0.2)
+                rects = rects.reduce((prev, cur, i, allRects) => {
+                    const tolRect = allRects
+                        .filter(r => r.x !== cur.x && r.y !== cur.y && !prev.some(r2 => r.x === r2.x && r.y === r2.y))
+                        .find(r => {
+                            const tol = Math.abs((cur.y - r.y) / 100);
+                            if (tol <= 0.2) {
+                                return r;
+                            }
+                        });
+
+                    if (tolRect) {
+                        prev.push(cur, tolRect);
+                    }
+
+                    return prev;
+                }, []);
+
+                if (rects.length !== 2) {
+                    resolve([]);
+                }
+
+                // reduce to 1 rect
+                const rect = rects.reduce((prev, cur) => {
+                    const res: any = Object.assign({}, cur);
+
+                    if (prev.x && cur.x < prev.x) {
+                        res.x = cur.x + cur.width;
+                        res.width = prev.x - cur.x - cur.width;
+                    } else if (prev.x && cur.x > prev.x) {
+                        res.x = prev.x + prev.width;
+                        res.width = cur.x - prev.x - prev.width;
+                    }
+
+                    if (prev.y && cur.y > prev.y) {
+                        res.y = prev.y;
+                    }
+
+                    if (cur.height < prev.height) {
+                        res.height = prev.height;
+                    }
+
+                    return res;
+                }, {});
+
+                // enlarge of 10 px y and height
+                rect.y = rect.y - 10;
+                rect.height = rect.height + 10;
+
+                if (context2d) {
+                    context2d.strokeStyle = '#ff0000';
+                    context2d.font = 'bold 12px Helvetica';
+                    context2d.fillStyle = '#ff0000';
+                    context2d.lineWidth = 4;
+                    context2d.strokeRect(rect.x, rect.y, rect.width, rect.height);
+                    // context.fillText('x: ' + rect.x + 'px', rect.x + rect.width + 5, rect.y + 11);
+                    // context.fillText('y: ' + rect.y + 'px', rect.x + rect.width + 5, rect.y + 22);
+                    // context2d.fillText('Det ', rect.x + 10, rect.y + 10);
+                }
+
+                resolve([rect]);
+            }
+        });
+
+        // tracking.track('#canvas', colorTracker, { camera: true });
+        tracking.track('#canvas', colorTracker);
+    });
 }
