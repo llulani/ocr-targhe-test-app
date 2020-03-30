@@ -1,0 +1,106 @@
+<div class="container">
+  <div fxLayout="column">
+    <div fxLayout="row" fxLayoutGap="12px">
+      <section fxFlex fxLayout="column" fxLayoutGap="12px">
+        <h3>Image processing</h3>
+        <div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="start center">
+          <input type="file" (change)="onFileChange($event)">
+        </div>
+        <div fxLayout="row" fxLayoutGap="24px" fxLayoutAlign="start center">
+          <div>
+            <input type="checkbox" [(ngModel)]="pre"> Pre apply filter
+          </div>
+          <div>
+            <input type="checkbox" [(ngModel)]="post"> Post apply filter
+          </div>
+        </div>
+        <div fxLayout="row" fxLayoutGap="24px" fxLayoutAlign="start center">
+          <div>
+            <input [(ngModel)]="applyGreyscale" type="checkbox"> Greyscale
+          </div>
+          <div>
+            <input [(ngModel)]="applyNormalize" type="checkbox"> Normalize
+          </div>
+        </div>
+        <div fxLayout="row" fxLayoutGap="24px" fxLayoutAlign="start center">
+          <div>
+            <input [(ngModel)]="applyContrast" type="checkbox"> Contrast
+            <input [(ngModel)]="contrast" type="number" min="0" max="1" step="0.1" [disabled]="!applyContrast">
+          </div>
+          <div>
+            <input [(ngModel)]="applyBrightness" type="checkbox"> Brightness
+            <input [(ngModel)]="brightness" type="number" min="0" max="1" step="0.1" [disabled]="!applyBrightness">
+          </div>
+        </div>
+      </section>
+      <section fxFlex fxLayout="column" fxLayoutGap="12px">
+        <h3>OCR processing</h3>
+        <div fxLayout="row" fxLayoutGap="24px" fxLayoutAlign="start center">
+          <div>
+            <input [(ngModel)]="ocrPsmSingleBlock" type="radio" [value]="false"> Page Seg. SINGLE_LINE
+          </div>
+          <div>
+            <input [(ngModel)]="ocrPsmSingleBlock" type="radio" [value]="true"> Page Seg. SINGLE_BLOCK
+          </div>
+        </div>
+        <h3>Color tracker</h3>
+        <div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="start center">
+          <span>R Min/Max</span>
+          <input [(ngModel)]="MIN_R" type="number" min="0" max="255" step="1">
+          <input [(ngModel)]="MAX_R" type="number" min="0" max="255" step="1">
+        </div>
+        <div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="start center">
+          <span>G Min/Max</span>
+          <input [(ngModel)]="MIN_G" type="number" min="0" max="255" step="1">
+          <input [(ngModel)]="MAX_G" type="number" min="0" max="255" step="1">
+        </div>
+        <div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="start center">
+          <span>B Min/Max</span>
+          <input [(ngModel)]="MIN_B" type="number" min="0" max="255" step="1">
+          <input [(ngModel)]="MAX_B" type="number" min="0" max="255" step="1">
+        </div>
+      </section>
+    </div>
+    <div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="start center">
+      <button (click)="start(false)" [disabled]="!initialImageContent || loading">Auto tracking</button>
+      <button (click)="start(true)" [disabled]="!initialImageContent || loading">Draw rect</button>
+    </div>
+  </div>
+
+
+  <div fxLayout="row" fxLayoutGap="12px">
+    <section fxFlex>
+      <h3>Loaded image</h3>
+      <canvas #canvas id="canvas" width="0" height="0"></canvas>
+    </section>
+    <section fxFlex>
+      <h3>Cropped images</h3>
+      <div class="loader" *ngIf="loading"></div>
+      <div *ngIf="!loading">
+        <div *ngFor="let res of results; let i = index" style="margin-top: 10px;" fxLayout="column" fxLayoutGap="12px" class="result">
+          <div>
+            <b>
+              <a href="#" (click)="$event.preventDefault(); res.open = !res.open">Crop {{i}}</a>
+            </b>
+          </div>
+          <div *ngIf="res.open">
+            <div><img [src]="res.image"></div>
+            <div fxLayout="row" fxLayoutGap="12px">
+              <b>Detected: </b> <span>{{res.ocrData.text}}</span>
+            </div>
+            <div fxLayout="row" fxLayoutGap="12px">
+              <b>Targa:</b> <span>{{res.targa}}</span>
+            </div>
+            <div>
+              <a href="#" (click)="showOcrDataAt($event, i)">Toggle OCR results</a>
+            </div>
+            <div fxLayout="row" fxLayoutGap="12px" *ngIf="res.showOcrData">
+              <pre>{{res.ocrData | json}}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+</div>

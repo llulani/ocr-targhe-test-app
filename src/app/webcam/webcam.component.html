@@ -1,0 +1,6 @@
+<webcam #webcam [trigger]="triggerObservable" (imageCapture)="handleImage($event)" *ngIf="!webcamImage"></webcam>
+<div>
+  <button (click)="triggerSnapshot()" >Shoot</button>
+  <button (click)="reset()" >Reset</button>
+</div>
+<div [hidden]="!webcamImage"><canvas #canvas id="canvas"></canvas></div>
