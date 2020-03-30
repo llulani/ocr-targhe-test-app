@@ -46,12 +46,12 @@ export class OCRProcessor {
     rects = [];
     context2d: CanvasRenderingContext2D;
 
-    constructor(public canvas: HTMLCanvasElement, public options: OCRProcessorOptions = DEFAULT_OPTIONS) {
+    constructor(public canvas: HTMLCanvasElement) {
         this.rects = [];
         this.context2d = this.canvas.getContext('2d');
     }
 
-    private async initTesseract() {
+    private async initTesseract(ocrPsmSingleBlock) {
         this.worker = createWorker({
             // logger: m => console.log(m)
         });
@@ -60,22 +60,22 @@ export class OCRProcessor {
         await this.worker.initialize('eng', OEM.LSTM_ONLY);
         await this.worker.setParameters({
             tessedit_char_whitelist: '0123456789QWERTYUIOPASDFGHJKLZXCVBNM',
-            tessedit_pageseg_mode: this.options.ocrPsmSingleBlock ? PSM.SINGLE_BLOCK : PSM.SINGLE_LINE
+            tessedit_pageseg_mode: ocrPsmSingleBlock ? PSM.SINGLE_BLOCK : PSM.SINGLE_LINE
         });
     }
 
-    async track(imageData): Promise<OcrResult[]> {
+    async track(imageData, options: OCRProcessorOptions = DEFAULT_OPTIONS): Promise<OcrResult[]> {
         return new Promise(resolve => {
             tracking.ColorTracker.registerColor(
                 'white',
                 // (r, g, b) => r >= 80 && r <= 255 && g >= 80 && g <= 255 && b >= 80 && b <= 255
                 (r, g, b) =>
-                    r >= this.options.MIN_R &&
-                    r <= this.options.MAX_R &&
-                    g >= this.options.MIN_G &&
-                    g <= this.options.MAX_G &&
-                    b >= this.options.MIN_B &&
-                    b <= this.options.MAX_B
+                    r >= options.MIN_R &&
+                    r <= options.MAX_R &&
+                    g >= options.MIN_G &&
+                    g <= options.MAX_G &&
+                    b >= options.MIN_B &&
+                    b <= options.MAX_B
             );
 
             const colorTracker = new tracking.ColorTracker(['white']);
@@ -105,7 +105,7 @@ export class OCRProcessor {
                         }
                     });
 
-                    resolve(this.cropAndRecognize(imageData));
+                    resolve(this.cropAndRecognize(imageData, options));
                 }
             });
 
@@ -114,10 +114,10 @@ export class OCRProcessor {
         });
     }
 
-    private async cropAndRecognize(imageData) {
+    private async cropAndRecognize(imageData, options: OCRProcessorOptions) {
         const results: OcrResult[] = [];
 
-        await this.initTesseract();
+        await this.initTesseract(options.ocrPsmSingleBlock);
 
         for (const r of this.rects) {
             const image = await jimp.read(imageData);
@@ -136,8 +136,8 @@ export class OCRProcessor {
                 [0, 0, 0]
             ];
 
-            if (this.options.filters) {
-                this.applyFilters(image);
+            if (options.filters) {
+                this.applyFilters(image, options);
             }
 
             const croppedImage = await new Promise(resolve => {
@@ -208,34 +208,31 @@ export class OCRProcessor {
         return null;
     }
 
-    applyFilters(image) {
-        if (this.options.filters.greyscale) {
+    applyFilters(image, options: OCRProcessorOptions) {
+        if (options.filters.greyscale) {
             image.greyscale();
         }
 
-        if (this.options.filters.contrast) {
-            console.log('Contrast');
-            image.contrast(this.options.filters.contrast);
+        if (options.filters.contrast) {
+            image.contrast(options.filters.contrast);
         }
 
-        if (this.options.filters.brightness) {
-            console.log('Brightness');
-            image.brightness(this.options.filters.brightness);
+        if (options.filters.brightness) {
+            image.brightness(options.filters.brightness);
         }
 
-        if (this.options.filters.normalize) {
-            console.log('Normalize');
+        if (options.filters.normalize) {
             image.normalize();
         }
     }
 
-    async recognizeFromRect(imageData, r: { x; y; width; height }) {
+    async recognizeFromRect(imageData, r: { x; y; width; height }, options: OCRProcessorOptions) {
         const results = [];
         const image = await jimp.read(imageData);
         image.crop(r.x, r.y, r.width, r.height);
 
-        if (this.options.filters) {
-            this.applyFilters(image);
+        if (options.filters) {
+            this.applyFilters(image, options);
         }
 
         const croppedImage = await new Promise(resolve => {
@@ -244,7 +241,7 @@ export class OCRProcessor {
             });
         });
 
-        await this.initTesseract();
+        await this.initTesseract(options.ocrPsmSingleBlock);
         const ocrRecognizedData = await this.ocr(croppedImage);
         const targa = this.findTarghe(ocrRecognizedData);
         results.push({

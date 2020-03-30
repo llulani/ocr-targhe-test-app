@@ -39,6 +39,24 @@ export class FileTestComponent implements OnInit, AfterViewInit {
 
     processor: OCRProcessor;
 
+    get ocrOptions() {
+        return {
+            ocrPsmSingleBlock: this.ocrPsmSingleBlock,
+            MIN_R: this.MIN_R,
+            MIN_G: this.MIN_G,
+            MIN_B: this.MIN_B,
+            MAX_R: this.MAX_R,
+            MAX_G: this.MAX_G,
+            MAX_B: this.MAX_B,
+            filters: {
+                greyscale: this.post && this.applyGreyscale,
+                contrast: this.post && this.applyContrast && this.contrast,
+                brightness: this.post && this.applyBrightness && this.brightness,
+                normalize: this.post && this.applyNormalize
+            }
+        };
+    }
+
     ngOnInit() {}
 
     ngAfterViewInit(): void {
@@ -56,21 +74,7 @@ export class FileTestComponent implements OnInit, AfterViewInit {
     }
 
     async start(draw) {
-        this.processor = new OCRProcessor(this.canvas.nativeElement, {
-            ocrPsmSingleBlock: this.ocrPsmSingleBlock,
-            MIN_R: this.MIN_R,
-            MIN_G: this.MIN_G,
-            MIN_B: this.MIN_B,
-            MAX_R: this.MAX_R,
-            MAX_G: this.MAX_G,
-            MAX_B: this.MAX_B,
-            filters: {
-                greyscale: this.post && this.applyGreyscale,
-                contrast: this.post && this.applyContrast && this.contrast,
-                brightness: this.post && this.applyBrightness && this.brightness,
-                normalize: this.post && this.applyNormalize
-            }
-        });
+        this.processor = new OCRProcessor(this.canvas.nativeElement);
 
         this.results = [];
         const img = new Image();
@@ -91,7 +95,7 @@ export class FileTestComponent implements OnInit, AfterViewInit {
         };
 
         if (this.pre) {
-            this.processor.applyFilters(image);
+            this.processor.applyFilters(image, this.ocrOptions);
         }
 
         img.src = await image.getBase64Async(image.getMIME());
@@ -101,10 +105,10 @@ export class FileTestComponent implements OnInit, AfterViewInit {
         if (draw) {
             this.loading = true;
             const r: any = await this.startDrawing(img);
-            this.results = await this.processor.recognizeFromRect(img.src, r);
+            this.results = await this.processor.recognizeFromRect(img.src, r, this.ocrOptions);
         } else {
             this.loading = true;
-            this.results = await this.processor.track(img.src);
+            this.results = await this.processor.track(img.src, this.ocrOptions);
         }
         this.loading = false;
     }
